@@ -1194,8 +1194,10 @@ async def create_message(
         )
 
     chat_body.setdefault("model", "auto")
-    # 读取用户的 stream 参数，如果未提供则默认为 True
-    user_stream = payload.get("stream", True)
+    # 读取用户的 stream 参数。Anthropic 协议里该字段默认 false，未提供时必须回 JSON：
+    # Claude Code 的 auto 模式分类器等 side query 不带 stream，收到 SSE 会解析出
+    # usage/stop_reason 全为 undefined 的对象，直接抛错导致分类器判为"模型不可用"。
+    user_stream = payload.get("stream", False)
     # 无论用户如何设置，都向后端请求流式响应（后端只支持流式）
     chat_body["stream"] = True
     if "stream_options" not in chat_body:

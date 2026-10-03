@@ -79,6 +79,11 @@ def anthropic_request_to_chat(body: dict) -> dict:
         if key in body:
             chat[key] = body[key]
 
+    # Anthropic 用 stop_sequences，Chat 用 stop。分类器依赖它在 </block> /
+    # </severity> 处截断输出，丢掉会让判定标签重复出现而解析失败。
+    if "stop_sequences" in body:
+        chat["stop"] = body["stop_sequences"]
+
     return chat
 
 
@@ -354,11 +359,13 @@ class AnthropicStreamConverter:
             "stop_reason": stop_reason,
             "stop_sequence": None,
         }
-        if self._usage:
-            resp["usage"] = {
-                "input_tokens": self._usage.get("prompt_tokens", 0),
-                "output_tokens": self._usage.get("completion_tokens", 0),
-            }
+        # usage 必须始终存在：调用方（如 Claude Code 分类器）会直接读
+        # usage.input_tokens / usage.output_tokens，缺失即抛 TypeError。
+        u = self._usage or {}
+        resp["usage"] = {
+            "input_tokens": u.get("prompt_tokens", 0),
+            "output_tokens": u.get("completion_tokens", 0),
+        }
         return resp
 
     # ---- 内部 ----
